@@ -64,7 +64,11 @@ class SimpleRepository(Repository):
 
     # Lab4: ITE-2 expiry period for root and targets = 365 days, others = 1 day
     # >>>
-    raise NotImplementedError("Implement this")
+    #raise NotImplementedError("Implement this")
+    # Define the expiry durations
+    # TASK1
+    self.expiry_period_root_targets = timedelta(days=365)  # 1 year for root and targets
+    self.expiry_period_others = timedelta(days=1)  # 1 day for other roles
     # <<<
 
     def _build_key_dir(self, base_url: str) -> str:
@@ -91,7 +95,32 @@ class SimpleRepository(Repository):
         # Lab4: Create signers as per ITE-2, root and targets share the same
         # key, snapshot and timestamp share the same key
         # >>>
-        raise NotImplementedError("Implement this")
+        #raise NotImplementedError("Implement this")
+        # TASK2
+        # Generate or load keys for root/targets and snapshot/timestamp
+        from securesystemslib.keys import generate_rsa_key, create_signature
+
+        # Generate a shared key for root and targets
+        root_targets_key = generate_rsa_key()
+        root_targets_signer = CryptoSigner(root_targets_key)
+
+        # Generate a shared key for snapshot and timestamp
+        snapshot_timestamp_key = generate_rsa_key()
+        snapshot_timestamp_signer = CryptoSigner(snapshot_timestamp_key)
+
+        # Store the signers in the cache
+        signers = {
+            "root": root_targets_signer,
+            "targets": root_targets_signer,
+            "snapshot": snapshot_timestamp_signer,
+            "timestamp": snapshot_timestamp_signer,
+        }
+
+        # Add the signers to the signer cache
+        self.signer_cache["root"].append(root_targets_signer)
+        self.signer_cache["targets"].append(root_targets_signer)
+        self.signer_cache["snapshot"].append(snapshot_timestamp_signer)
+        self.signer_cache["timestamp"].append(snapshot_timestamp_signer)
         # <<<
 
         # setup a basic repository, generate signing key per top-level role
@@ -108,7 +137,37 @@ class SimpleRepository(Repository):
         # packages-and-in-toto-metadata-signer. This role uses the same key as
         # timestamp and snapshot
         # >>>
-        raise NotImplementedError("Implement this")
+        #raise NotImplementedError("Implement this")
+        # TASK3
+
+        # Define the role name for the delegation
+        delegatee_name = "packages-and-in-toto-metadata-signer"
+
+        # Use the same key as snapshot and timestamp
+        packages_signer = self.signer_cache["snapshot"][0]
+
+        # Add the delegation to the targets role
+        with self.edit_targets() as targets:
+            if targets.delegations is None:
+                targets.delegations = Delegations({}, {})
+    
+            if targets.delegations.roles is None:
+                targets.delegations.roles = {}
+
+            # Create the delegated role
+            delegated_role = DelegatedRole(
+                name=delegatee_name,
+                keyids=[packages_signer.key_dict["keyid"]],
+                threshold=1,
+                terminating=True,
+                paths=[f"{delegatee_name}/*"]  # Define the paths this role can sign
+            )
+    
+            # Add the delegated role
+            targets.delegations.roles[delegatee_name] = delegated_role
+    
+            # Add the key used by this delegation
+            targets.add_key(packages_signer.key_dict, delegatee_name)
         # <<<
         
         # share the private key of packages-and-in-toto-metadata-signer
@@ -131,7 +190,8 @@ class SimpleRepository(Repository):
         # public keys required to sign the layout can be determined from the
         # layout custom metadata
         # >>>
-        raise NotImplementedError("Implement this")
+        # TASK4
+        #raise NotImplementedError("Implement this")
 
         # for layout_file in layouts:
             # read the layout metadata file and the custom_metadata for that
@@ -142,7 +202,32 @@ class SimpleRepository(Repository):
 
             # iterate over the pubkeys mentioned in the custom metadata and add
             # them as targets to the `targets` role
+ 
+        # Iterate over the layouts
+        for layout_file in layouts:
+            layout_path = os.path.join(TARGETS_DIR, layout_file)
+            
+            # Read the layout metadata file
+            with open(layout_path, "r") as f:
+                layout_content = f.read()
+            
+            # Assume layout custom metadata is stored in JSON format
+            layout_custom_metadata = json.loads(layout_content)
 
+            # Add the layout as a target to the `targets` role
+            with self.edit_targets() as targets:
+                targets.targets[layout_file] = TargetFile.from_data(
+                    layout_file, bytes(layout_content, "utf-8")
+                )
+                # Add the custom metadata for the layout
+                targets.targets[layout_file].unrecognized_fields = layout_custom_metadata
+
+            # Extract public keys from the custom metadata
+            if "public_keys" in layout_custom_metadata:
+                for keyid, key_dict in layout_custom_metadata["public_keys"].items():
+                    # Add the public keys required to sign the layout as targets
+                    with self.edit_targets() as targets:
+                        targets.add_key(key_dict, role_name="targets")
         # <<<
 
 
