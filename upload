@@ -3,31 +3,85 @@
 import os
 import subprocess
 import argparse
-import hashlib
 
+# Directories
 TARGETS_DIR = "targets-ite2/"
 PACKAGES_DIR = "packages/"
 IN_TOTO_METADATA_DIR = "in-toto-metadata/"
 PUBKEYS_DIR = "in-toto-pubkeys/"
-# Define role
+
+# Define role and filenames that have to be passed to `../tuf-ite2/uploader/uploader` binary
 ROLE = "packages-and-in-toto-metadata-signer"
 
-
 def main():
-    raise NotImplementedError("This script is not implemented yet.")
-
-    # Take package name as argument
+    # Parse command-line arguments and take the name of the package to upload as an argument
+    parser = argparse.ArgumentParser(description="Upload package with in-toto metadata")
+    parser.add_argument("package_name", type=str, help="The name of the package to upload")
+    args = parser.parse_args()
+    package_name = args.package_name
 
     # Before uploading, you must change to the directory where the targets are stored
+    # Ensure targets directory exists
+    if not os.path.isdir(TARGETS_DIR):
+        print(f"Error: {TARGETS_DIR} directory does not exist.")
+        return
 
-    # Define role and filenames that have to be passed to `../tuf-ite2/uploader/uploader` binary
+    # Change to targets directory
+    os.chdir(TARGETS_DIR)
+
+    # Define paths for uploader
+    package_file = os.path.join(PACKAGES_DIR, f"{package_name}.tar.gz")
+    layout_file = os.path.join(IN_TOTO_METADATA_DIR, f"{package_name}.layout")
+    pubkey_file = os.path.join(PUBKEYS_DIR, f"{package_name}.pub")
+
+    # Check if required files exist
+    if not os.path.isfile(package_file):
+        print(f"Error: Package file {package_file} not found.")
+        return
+
+    if not os.path.isfile(layout_file):
+        print(f"Error: Layout file {layout_file} not found.")
+        return
+
+    if not os.path.isfile(pubkey_file):
+        print(f"Error: Public key file {pubkey_file} not found.")
+        return
 
     # uploader init (tofu)
+    # Initialize uploader
+    try:
+        subprocess.run(["../tuf-ite2/uploader/uploader", "init", "--tofu"], check=True)
+    except subprocess.CalledProcessError:
+        print("Error: Failed to initialize uploader.")
+        return
 
     # upload package with its custom metadata
+    try:
+        subprocess.run([
+            "../tuf-ite2/uploader/uploader", "upload", 
+            "--role", ROLE, 
+            "--file", package_file, 
+            "--custom-metadata", layout_file
+        ], check=True)
+        print(f"Successfully uploaded package {package_name}.")
+    except subprocess.CalledProcessError:
+        print("Error: Failed to upload package.")
+        return
 
     # upload all the links corresponding for the package you uploaded
-
+    try:
+        for link_file in os.listdir(IN_TOTO_METADATA_DIR):
+            if link_file.startswith(package_name) and link_file.endswith(".link"):
+                link_path = os.path.join(IN_TOTO_METADATA_DIR, link_file)
+                subprocess.run([
+                    "../tuf-ite2/uploader/uploader", "upload",
+                    "--role", ROLE, 
+                    "--file", link_path
+                ], check=True)
+                print(f"Uploaded link file: {link_file}")
+    except subprocess.CalledProcessError:
+        print("Error: Failed to upload link files.")
+        return
 
 if __name__ == "__main__":
     main()
