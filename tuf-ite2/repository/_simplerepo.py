@@ -67,8 +67,8 @@ class SimpleRepository(Repository):
     #raise NotImplementedError("Implement this")
     # Define the expiry durations
     # TASK1
-    self.expiry_period_root_targets = timedelta(days=365)  # 1 year for root and targets
-    self.expiry_period_others = timedelta(days=1)  # 1 day for other roles
+    expiry_period_root_timestamp = timedelta(days=365)  # 1 year for root and targets
+    expiry_period = timedelta(days=1)  # 1 day for other roles
     # <<<
 
     def _build_key_dir(self, base_url: str) -> str:
@@ -98,15 +98,12 @@ class SimpleRepository(Repository):
         #raise NotImplementedError("Implement this")
         # TASK2
         # Generate or load keys for root/targets and snapshot/timestamp
-        from securesystemslib.keys import generate_rsa_key, create_signature
 
         # Generate a shared key for root and targets
-        root_targets_key = generate_rsa_key()
-        root_targets_signer = CryptoSigner(root_targets_key)
+        root_targets_signer = CryptoSigner.generate_ecdsa()
 
         # Generate a shared key for snapshot and timestamp
-        snapshot_timestamp_key = generate_rsa_key()
-        snapshot_timestamp_signer = CryptoSigner(snapshot_timestamp_key)
+        snapshot_timestamp_signer = CryptoSigner.generate_ecdsa()
 
         # Store the signers in the cache
         signers = {
@@ -157,7 +154,7 @@ class SimpleRepository(Repository):
             # Create the delegated role
             delegated_role = DelegatedRole(
                 name=delegatee_name,
-                keyids=[packages_signer.key_dict["keyid"]],
+                keyids=packages_signer.public_key.to_dict(),
                 threshold=1,
                 terminating=True,
                 paths=[f"{delegatee_name}/*"]  # Define the paths this role can sign
@@ -167,7 +164,7 @@ class SimpleRepository(Repository):
             targets.delegations.roles[delegatee_name] = delegated_role
     
             # Add the key used by this delegation
-            targets.add_key(packages_signer.key_dict, delegatee_name)
+            targets.add_key(packages_signer.public_key.to_dict(), delegatee_name)
         # <<<
         
         # share the private key of packages-and-in-toto-metadata-signer
