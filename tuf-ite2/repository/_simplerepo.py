@@ -150,11 +150,17 @@ class SimpleRepository(Repository):
     
             if targets.delegations.roles is None:
                 targets.delegations.roles = {}
-
+            
+            key_dict = {
+                "private_key": packages_signer._private_key,
+                "public_key": packages_signer.public_key,
+                "keyid": packages_signer.public_key.keyid
+            }
+            
             # Create the delegated role
             delegated_role = DelegatedRole(
                 name=delegatee_name,
-                keyids=packages_signer.public_key.to_dict(),
+                keyids=key_dict,
                 threshold=1,
                 terminating=True,
                 paths=[f"{delegatee_name}/*"]  # Define the paths this role can sign
@@ -164,7 +170,7 @@ class SimpleRepository(Repository):
             targets.delegations.roles[delegatee_name] = delegated_role
     
             # Add the key used by this delegation
-            targets.add_key(packages_signer.public_key.to_dict(), delegatee_name)
+            targets.add_key(packages_signer.public_key, delegatee_name)
         # <<<
         
         # share the private key of packages-and-in-toto-metadata-signer
