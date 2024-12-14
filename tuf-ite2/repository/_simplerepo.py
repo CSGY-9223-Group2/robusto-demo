@@ -105,6 +105,9 @@ class SimpleRepository(Repository):
         # Generate a shared key for snapshot and timestamp
         snapshot_timestamp_signer = CryptoSigner.generate_ecdsa()
 
+        # not great, but this variable is requested in the part of code which shouldn't be changed (line 188)
+        timestamp_snapshot_key = snapshot_timestamp_signer
+
         # Store the signers in the cache
         signers = {
             "root": root_targets_signer,
@@ -138,7 +141,7 @@ class SimpleRepository(Repository):
         # TASK3
 
         # Define the role name for the delegation
-        delegatee_name = "packages-and-in-toto-metadata-signer"
+        delgatee_name = "packages-and-in-toto-metadata-signer"
 
         # Use the same key as snapshot and timestamp
         packages_signer = self.signer_cache["snapshot"][0]
@@ -157,20 +160,22 @@ class SimpleRepository(Repository):
                 "keyid": packages_signer.public_key.keyid
             }
             
+            keyid = packages_signer.public_key.keyid
+            
             # Create the delegated role
             delegated_role = DelegatedRole(
-                name=delegatee_name,
-                keyids=key_dict,
+                name=delgatee_name,
+                keyids=[keyid],
                 threshold=1,
                 terminating=True,
-                paths=[f"{delegatee_name}/*"]  # Define the paths this role can sign
+                paths=[f"{delgatee_name}/*"]  # Define the paths this role can sign
             )
     
             # Add the delegated role
-            targets.delegations.roles[delegatee_name] = delegated_role
+            targets.delegations.roles[delgatee_name] = delegated_role
     
             # Add the key used by this delegation
-            targets.add_key(packages_signer.public_key, delegatee_name)
+            targets.add_key(packages_signer.public_key, delgatee_name)
         # <<<
         
         # share the private key of packages-and-in-toto-metadata-signer
