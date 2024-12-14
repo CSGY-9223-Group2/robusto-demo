@@ -53,11 +53,39 @@ class LocalRepository(Repository):
 
     @property
     def targets_infos(self) -> dict[str, MetaFile]:
-        raise NotImplementedError  # we never call snapshot
+        # TASK1
+        #raise NotImplementedError  # we never call snapshot
+        targets_info = {}
+        # get metadata information from the updater._trusted_set
+        # Error check and ensure targets role exists in the updater's trusted set
+        if "targets" in self.updater._trusted_set:
+            targets_md = self.updater._trusted_set["targets"]
+            # Extract target file information - need data length, hash, and version
+            for targetpath, targetfile in targets_md.targets.items():
+                targets_info[targetpath] = MetaFile(
+                    length=targetfile.length,
+                    hashes=targetfile.hashes,
+                    version=targets_md.version,
+            )
+
+        return targets_info
 
     @property
     def snapshot_info(self) -> MetaFile:
-        raise NotImplementedError  # we never call timestamp
+        # TASK2
+        #raise NotImplementedError  # we never call timestamp
+        if "snapshot" not in self.updater._trusted_set:
+            raise RepositoryError("Snapshot metadata not found in trusted set")
+
+        snapshot_md = self.updater._trusted_set["snapshot"]
+
+        # Extract and return relevant snapshot metadata as a MetaFile
+        # convert to bytes for data length, hash, and get version
+        return MetaFile(
+            length=len(snapshot_md.to_bytes(JSONSerializer())),
+            hashes={"sha256": snapshot_md.signed_hash()},
+            version=snapshot_md.version,
+        )
 
     def open(self, role: str) -> Metadata:
         """Return cached (or fetched) metadata"""
