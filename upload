@@ -14,20 +14,57 @@ ROLE = "packages-and-in-toto-metadata-signer"
 
 
 def main():
-    raise NotImplementedError("This script is not implemented yet.")
-
+    
     # Take package name as argument
+    parser = argparse.ArgumentParser(description="Upload a package to a TUF repository")
+    parser.add_argument("package", help="The name of the package to upload")
 
+    args = parser.parse_args()
     # Before uploading, you must change to the directory where the targets are stored
+    os.chdir(TARGETS_DIR)
 
     # Define role and filenames that have to be passed to `../tuf-ite2/uploader/uploader` binary
+    package_name = args.package
+    package_sha_hash = hashlib.sha256(package_name.encode('utf-8')).hexdigest()
+    links_dir = f'{IN_TOTO_METADATA_DIR}{package_sha_hash}'
+   
+    # Paths for package data
+    package_path = f'{PACKAGES_DIR}{package_name}'
+    package_custom_path = f'{package_sha_hash}.package.custom'
+
+
 
     # uploader init (tofu)
-
+    try:
+        subprocess.run(['../tuf-ite2/uploader/uploader', 'tofu'], check=True)
+    except subprocess.CalledProcessError:
+        print('Error: Failed to initialize uploader.')
+        return
     # upload package with its custom metadata
+    try:
+        subprocess.run([
+            '../tuf-ite2/uploader/uploader',
+            'add-target',
+            ROLE,
+            package_path,
+            f'--custom={package_custom_path}',
+        ], check=True)
+    except subprocess.CalledProcessError:
+        print(f'Error: Failed to upload item: {package_item}')
+        return 
 
     # upload all the links corresponding for the package you uploaded
-
+    for link in os.listdir(links_dir):
+        try:
+            subprocess.run([
+                '../tuf-ite2/uploader/uploader',
+                'add-target',
+                ROLE,
+                f'{links_dir}/{link}'
+            ])
+        except subprocess.CalledProcessError:
+            print(f'Error: Failed to upload item: {package_item}')
+            return 
 
 if __name__ == "__main__":
     main()

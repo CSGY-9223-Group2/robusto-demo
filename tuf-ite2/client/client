@@ -101,7 +101,13 @@ def download(base_url: str, target: str) -> bool:
         
         # Lab4: recursively download files mentioned in the custom field
         # >>>
-        raise NotImplementedError("Implement this")
+        #raise NotImplementedError("Implement this")
+        
+        if info.custom:
+            if info.custom['in-toto']:
+                for custom_file in info.custom['in-toto']:
+                    print(custom_file)
+                    download(base_url, custom_file)
         # <<<
 
         print(f"Target downloaded and available in {path}")
